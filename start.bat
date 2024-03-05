@@ -1,0 +1,9 @@
+@echo off
+echo Running get_tables command...
+python manage.py get_tables
+
+echo Running createmodels command...
+python manage.py createmodels
+
+echo Running server command...
+python manage.py runserver 
