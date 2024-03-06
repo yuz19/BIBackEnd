@@ -17,10 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from myapp import views
-
+from myapp.views import analyse
 urlpatterns = [
     # path('student/', views.studentApi),
     # path('student/<int:pk>/', views.studentDetailApi),
+    path('api/your_endpoint/', analyse, name='analyse'),
     path('admin/', admin.site.urls),
 ]
 
