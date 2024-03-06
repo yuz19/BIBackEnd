@@ -6,5 +6,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Call the inspectdb command to generate models
-        with open("models.py", "w") as f:
+        with open("./myapp/models.py", "w") as f:
             call_command('inspectdb', stdout=f)
