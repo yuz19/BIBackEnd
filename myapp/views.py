@@ -108,46 +108,50 @@ def granger(columns):
         print(affichage)
 
     return affichage_granger, html_content
-
-@api_view(['POST'])
+array_return=[]
+@csrf_exempt
+@api_view(['GET', 'POST'])
 def analyse(request):
-    columns = request.data.get('columns', [])
-    algorithms=request.data.get('algorithms',[])
-    array_return = []
-    
-    if(any(algorithms)):
+    global array_return
+     
+    if request.method == 'POST':
         
-        if algorithms.get('granger', False):
-            granger_result = granger(columns)
-            if granger_result:
-                array_return.append({'granger': granger_result})
-                
-        if algorithms.get('apriori', False):
-            apriori_result = apriori(columns)
-            if apriori_result:
-                array_return.append({'apriori': apriori_result})
-                
-        if algorithms.get('decision', False):
-            decision_result = decision(columns)
-            if decision_result:
-                array_return.append({'decision': decision_result})
-                
-        if algorithms.get('proposer', False):
-            proposer_result = proposer(columns)
-            if proposer_result:
-                array_return.append({'proposer': proposer_result})
-                
-        if array_return:
-            return JsonResponse(array_return, safe=False)
+
+        columns = request.data.get('columns', [])
+        algorithms = request.data.get('algorithms', [])
+        
+        if any(algorithms):
+            if algorithms.get('granger', False):
+                granger_result = granger(columns)
+                if granger_result:
+                    array_return.append({'granger': granger_result})
+                    
+            if algorithms.get('apriori', False):
+                apriori_result = apriori(columns)
+                if apriori_result:
+                    array_return.append({'apriori': apriori_result})
+                    
+            if algorithms.get('decision', False):
+                decision_result = decision(columns)
+                if decision_result:
+                    array_return.append({'decision': decision_result})
+                    
+            if algorithms.get('proposer', False):
+                proposer_result = proposer(columns)
+                if proposer_result:
+                    array_return.append({'proposer': proposer_result})
+                    
+            if array_return:
+                return Response(array_return)
+            else:
+                return Response({"message": "No results found"}, status=404)
+        
+        
         else:
-            return Response({"message": "No results found"}, status=404)
+            return Response({"Error": "Choisir un algorithme"})
     
-    else:
-        return Response({"Error": "Choisir un algorithms"}) 
-
-    return Response({"message": "Analysis completed"})
-
- 
+    elif request.method == 'GET':
+        return Response(array_return)
 
 
 
