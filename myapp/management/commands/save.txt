@@ -1,0 +1,66 @@
+from django.core.management.base import BaseCommand
+import mysql.connector
+
+class Command(BaseCommand):
+    help = 'Retrieve table names and their create table statements'
+
+    def __init__(self, conn,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.conn = conn
+
+
+ 
+
+    def handle(self, *args, **options):
+        try:
+            if not self.conn or not self.conn.is_connected():
+                self.stderr.write("MySQL connection is not established.")
+                return
+
+            # Execute SQL queries to retrieve table names and their create table statements
+            with self.conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_type = 'BASE TABLE' AND table_schema = DATABASE()
+                """)
+                table_names = cursor.fetchall()
+
+                if not table_names:
+                    self.stdout.write("No tables found in the database.")
+                    return
+
+                for table_name in table_names:
+                    cursor.execute(f"SHOW CREATE TABLE {table_name[0]}")
+                    create_table_statement = cursor.fetchone()[1]
+                    self.stdout.write(f"Table: {table_name[0]}\n{create_table_statement}\n")
+        except mysql.connector.Error as e:
+            self.stderr.write(f"Error connecting to MySQL: {e}")
+
+
+
+
+from django.core.management.base import BaseCommand
+from django.core.management import call_command
+
+class Command(BaseCommand):
+    help = 'Generate models from the existing database schema'
+    def __init__(self, dbname,root,password,hostname,port,*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dbname = dbname
+        self.user=root
+        self.password=password
+        self.host=hostname
+        self.port=port
+    def handle(self, *args, **options):
+        db_settings = {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME':  self.dbname,
+            'USER':  self.user,
+            'PASSWORD':  self.password,
+            'HOST':  self.host,
+            'PORT':  self.port,
+        }
+        # Call the inspectdb command to generate models
+        with open("./myapp/models.py", "w") as f:
+            call_command('inspectdb', database='default', stdout=f, **db_settings)

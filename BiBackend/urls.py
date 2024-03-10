@@ -17,11 +17,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from myapp import views
-from myapp.views import analyse
+from myapp.views import (analyse,connect_to_mysql,reconnect_to_mysql)
 urlpatterns = [
     # path('student/', views.studentApi),
     # path('student/<int:pk>/', views.studentDetailApi),
-    path('api/your_endpoint/', analyse, name='analyse'),
+    path('api/analyse/', analyse, name='analyse'),
+    path('api/sql/', connect_to_mysql, name='mysql'),
+    path('api/resql/', reconnect_to_mysql, name='remysql'),
     path('admin/', admin.site.urls),
 ]
 

@@ -1,11 +1,17 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from django.db import connection
+
 import pandas as pd
 from statsmodels.tsa.stattools import grangercausalitytests
 import plotly.graph_objects as go
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+
+import mysql.connector
+
 def get_columns_from_table(table_name):
-    cursor = connection.cursor()
+    global conn
+    cursor = conn.cursor()
     cursor.execute(f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{table_name}'")
     rows = cursor.fetchall()
     columns = [row[0] for row in rows]
@@ -15,7 +21,7 @@ def granger(columns):
     tables_with_columns = {}
     # Récupérer les tables associées à chaque colonne spécifiée
     for column in columns:
-        cursor = connection.cursor()
+        cursor = conn.cursor()
         cursor.execute(f"SELECT DISTINCT TABLE_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME = '{column}'")
         rows = cursor.fetchall()
         for row in rows:
@@ -32,7 +38,7 @@ def granger(columns):
     data_frames = {}
     for table_name, table_columns in tables_with_columns.items():
         for column in table_columns:
-            cursor = connection.cursor()
+            cursor = conn.cursor()
             cursor.execute(f"SELECT {column} FROM {table_name}")
             rows = cursor.fetchall()
             if column in data_frames:
@@ -64,9 +70,7 @@ def granger(columns):
     fig.update_layout(title='Data Visualization', xaxis_title='Index', yaxis_title='Value', xaxis=dict(range=initial_range))
 
     # Save the HTML string to a variable
-   
-    html_file_path = 'graph.html'
-    fig.write_html(html_file_path)
+    html_content = fig.to_html()
     # Show the figure
     # fig.show()
     # Perform the Granger causality test
@@ -103,10 +107,121 @@ def granger(columns):
     for affichage in affichage_granger:
         print(affichage)
 
-    return affichage_granger
+    return affichage_granger, html_content
 
 @api_view(['POST'])
 def analyse(request):
     columns = request.data.get('columns', [])
-    granger(columns)  # Appeler la fonction de test de causalité de Granger avec les colonnes fournies
+    algorithms=request.data.get('algorithms',[])
+    array_return = []
+    
+    if(any(algorithms)):
+        
+        if algorithms.get('granger', False):
+            granger_result = granger(columns)
+            if granger_result:
+                array_return.append({'granger': granger_result})
+                
+        if algorithms.get('apriori', False):
+            apriori_result = apriori(columns)
+            if apriori_result:
+                array_return.append({'apriori': apriori_result})
+                
+        if algorithms.get('decision', False):
+            decision_result = decision(columns)
+            if decision_result:
+                array_return.append({'decision': decision_result})
+                
+        if algorithms.get('proposer', False):
+            proposer_result = proposer(columns)
+            if proposer_result:
+                array_return.append({'proposer': proposer_result})
+                
+        if array_return:
+            return JsonResponse(array_return, safe=False)
+        else:
+            return Response({"message": "No results found"}, status=404)
+    
+    else:
+        return Response({"Error": "Choisir un algorithms"}) 
+
     return Response({"message": "Analysis completed"})
+
+ 
+
+
+
+# Connexion MySQL
+import json
+conn = None
+@csrf_exempt
+def connect_to_mysql(request):
+    global conn
+    if request.method == 'POST':
+        # Récupérer les données POST du frontend
+        data = json.loads(request.body)
+        # Extraire les informations de connexion MySQL
+        hostname = data.get('host')
+        dbname = data.get('database')
+        root = data.get('user')
+        password = data.get('password')
+        port=data.get('port')
+        print(data.get('host')) 
+        # Etablir une connexion avec MySQL
+        try:
+            conn = mysql.connector.connect(
+                host=hostname,
+                database=dbname,
+                user=root,
+                password=password,
+                port=port
+            )
+            if conn.is_connected():
+                return JsonResponse({'message': 'Connexion réussie à MySQL'})
+            else:
+                return JsonResponse({'error': 'Impossible de se connecter à MySQL'}, status=500)
+        except mysql.connector.Error as e:
+            return JsonResponse({'error': f'Erreur de connexion à MySQL : {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+
+@csrf_exempt
+def reconnect_to_mysql(request):
+    global conn
+    if request.method == 'POST':
+        # Récupérer les données POST du frontend
+        data = json.loads(request.body)
+
+
+        # Extraire les nouvelles informations de connexion MySQL
+        hostname = data.get('host')
+        dbname = data.get('database')
+        root = data.get('user')
+        password = data.get('password')
+        port=data.get('port')
+         
+        # Mettre à jour la connexion MySQL avec les nouvelles informations de connexion
+        try:
+            if conn and conn.is_connected():
+                conn.close()
+             
+            conn = mysql.connector.connect(
+                host=hostname,
+                database=dbname,
+                user=root,
+                password=password,
+                port=port
+            )
+            if conn.is_connected():
+                CreateModels();
+                CreateSerializer();
+                GetTables();
+                return JsonResponse({'message': 'Reconnexion réussie à MySQL avec de nouvelles informations de connexion'})
+            else:
+                return JsonResponse({'error': 'Impossible de se reconnecter à MySQL avec de nouvelles informations de connexion'}, status=500)
+        except mysql.connector.Error as e:
+            return JsonResponse({'error': f'Erreur de reconnexion à MySQL avec de nouvelles informations de connexion : {str(e)}'}, status=500)
+
+    else:
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
