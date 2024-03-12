@@ -6,7 +6,7 @@ from statsmodels.tsa.stattools import grangercausalitytests
 import plotly.graph_objects as go
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-
+import plotly.offline as opy
 import mysql.connector
 
 def get_columns_from_table(table_name):
@@ -46,11 +46,11 @@ def granger(columns):
             else:
                 data_frames[column] = [row[0] for row in rows]
     # Create a figure
-    fig = go.Figure()
+    # fig = go.Figure()
         
-    # Add traces for each column in data_frames
-    for column_name, column_data in data_frames.items():
-        fig.add_trace(go.Scatter(x=list(range(len(column_data))), y=column_data, mode='lines', name=column_name))
+    # # Add traces for each column in data_frames
+    # for column_name, column_data in data_frames.items():
+    #     fig.add_trace(go.Scatter(x=list(range(len(column_data))), y=column_data, mode='lines', name=column_name))
 
 
 
@@ -66,11 +66,11 @@ def granger(columns):
     max_lag = 5  # Choisissez le nombre maximal de retards à tester
     print(df)
     # Update layout
-    initial_range = [df.index.min(), df.index.min() + 500] 
-    fig.update_layout(title='Data Visualization', xaxis_title='Index', yaxis_title='Value', xaxis=dict(range=initial_range))
-
+    # initial_range = [df.index.min(), df.index.min() + 500] 
+    # fig.update_layout(title='Data Visualization', xaxis_title='Index', yaxis_title='Value', xaxis=dict(range=initial_range))
+    
     # Save the HTML string to a variable
-    html_content = fig.to_html()
+    # html_content = fig.to_html()
     # Show the figure
     # fig.show()
     # Perform the Granger causality test
@@ -99,15 +99,15 @@ def granger(columns):
     significant_lags = [lag for lag, p_value in enumerate(p_values, 1) if p_value < 0.05]
 
     if significant_lags:
-        affichage_granger.append(f'\nCausalité trouvée pour au moins un délai : {significant_lags}\n')
+        affichage_granger.append(f'Causalité trouvée pour au moins un délai : {significant_lags}')
     else:
-        affichage_granger.append('\nAucune causalité trouvée pour tous les délais testés.\n')
+        affichage_granger.append('Aucune causalité trouvée pour tous les délais testés.')
 
     # Imprimer les résultats d'affichage
     for affichage in affichage_granger:
         print(affichage)
 
-    return affichage_granger, html_content
+    return affichage_granger,columns, data_frames
 array_return=[]
 @csrf_exempt
 @api_view(['GET', 'POST'])
