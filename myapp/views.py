@@ -186,7 +186,7 @@ def analyse(request):
     global array_return
      
     if request.method == 'POST':
-        
+        array_return=[]
 
         columns = request.data.get('columns', [])
         algorithms = request.data.get('algorithms', [])
@@ -230,9 +230,11 @@ def analyse(request):
 # Connexion MySQL
 import json
 conn = None
+connection_info={}
 @csrf_exempt
 def connect_to_mysql(request):
     global conn
+    global connection_info
     if request.method == 'POST':
         # Récupérer les données POST du frontend
         data = json.loads(request.body)
@@ -252,6 +254,13 @@ def connect_to_mysql(request):
                 password=password,
                 port=port
             )
+            connection_info = {
+                'host': hostname,
+                'database': dbname,
+                'user': root,
+                'password': password,
+                'port': port
+            }
             if conn.is_connected():
                 return JsonResponse({'message': 'Connexion réussie à MySQL'})
             else:
@@ -259,6 +268,9 @@ def connect_to_mysql(request):
         except mysql.connector.Error as e:
             return JsonResponse({'error': f'Erreur de connexion à MySQL : {str(e)}'}, status=500)
 
+    elif request.method == 'GET':
+            if connection_info:
+                return JsonResponse(connection_info)
     else:
         return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
 
