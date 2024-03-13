@@ -8,14 +8,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import plotly.offline as opy
 import mysql.connector
+from mlxtend.preprocessing import TransactionEncoder
+from mlxtend.frequent_patterns import apriori
 
-def get_columns_from_table(table_name):
-    global conn
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{table_name}'")
-    rows = cursor.fetchall()
-    columns = [row[0] for row in rows]
-    return columns
+
+# def get_columns_from_table(table_name):
+#     global conn
+#     cursor = conn.cursor()
+#     cursor.execute(f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{table_name}'")
+#     rows = cursor.fetchall()
+#     columns = [row[0] for row in rows]
+#     return columns
 
 def granger(columns):
     tables_with_columns = {}
@@ -83,6 +86,7 @@ def granger(columns):
     test_F_values = []
     p_values = []
     affichage_granger = []
+    lag_results=[]
     # Afficher et stocker les résultats dans les variables
     if results:
         for lag in range(1, max_lag + 1):
@@ -91,6 +95,13 @@ def granger(columns):
             p_value = results[lag][0]["ssr_ftest"][1]
             print(f'Test F : {test_F_value}')
             print(f'P-valeur : {p_value}')
+            
+            lag_results.append({
+            'lag': lag,
+            'test_F_value': test_F_value,
+            'p_value': p_value
+            })
+            
             # Stocker les résultats dans les listes
             test_F_values.append(test_F_value)
             p_values.append(p_value)
@@ -107,7 +118,67 @@ def granger(columns):
     for affichage in affichage_granger:
         print(affichage)
 
-    return affichage_granger,columns, data_frames
+    return affichage_granger,columns, data_frames,lag_results
+
+def custom_apriori(columns):
+    tables_with_columns = {}
+
+    # Récupérer les tables associées à chaque colonne spécifiée
+    for column in columns:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT DISTINCT TABLE_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE COLUMN_NAME = '{column}'")
+        rows = cursor.fetchall()
+        for row in rows:
+            table_name = row[0]
+            if table_name in tables_with_columns:
+                tables_with_columns[table_name].append(column)
+            else:
+                tables_with_columns[table_name] = [column]
+
+    if not tables_with_columns:
+        return Response({"message": "No tables found containing the specified columns."})
+
+    # Récupérer les données pour chaque colonne et les stocker dans un DataFrame
+    data_frames = {}
+    for table_name, table_columns in tables_with_columns.items():
+        for column in table_columns:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT {column} FROM {table_name}")
+            rows = cursor.fetchall()
+            if column in data_frames:
+                data_frames[column].extend([row[0] for row in rows])
+            else:
+                data_frames[column] = [row[0] for row in rows]
+
+    # Create a DataFrame from the dictionary
+    df = pd.DataFrame(data_frames)
+
+    # Remplacer les valeurs manquantes avec la moyenne de chaque colonne
+    df = df.fillna(df.mean())
+
+    # Identifier les colonnes nécessitant une conversion en chaînes
+    columns_to_str = df.columns.tolist()
+
+    # Convertir uniquement les colonnes nécessaires en chaînes
+    df[columns_to_str] = df[columns_to_str].astype(str)
+
+    # Convertir les données en transactions
+    transactions = df.values.tolist()
+
+    # Appliquer l'algorithme Apriori
+    te = TransactionEncoder()
+    te_ary = te.fit(transactions).transform(transactions)
+    df = pd.DataFrame(te_ary, columns=te.columns_)
+    frequent_itemsets = apriori(df, min_support=0.1, use_colnames=False)
+
+    # Afficher les ensembles fréquents dans le terminal
+    print("\nEnsembles fréquents :")
+    print(frequent_itemsets)
+
+    
+    # html_content = ""
+    return frequent_itemsets
+
 array_return=[]
 @csrf_exempt
 @api_view(['GET', 'POST'])
@@ -127,8 +198,9 @@ def analyse(request):
                     array_return.append({'granger': granger_result})
                     
             if algorithms.get('apriori', False):
-                apriori_result = apriori(columns)
-                if apriori_result:
+                apriori_result = custom_apriori(columns)
+                # if apriori_result:
+                if not apriori_result.empty:
                     array_return.append({'apriori': apriori_result})
                     
             if algorithms.get('decision', False):
