@@ -196,12 +196,17 @@ def analyse(request):
                 granger_result = granger(columns)
                 if granger_result:
                     array_return.append({'granger': granger_result})
+                else:
+                    array_return.append({'granger':[]})
+                    
                     
             if algorithms.get('apriori', False):
                 apriori_result = custom_apriori(columns)
                 # if apriori_result:
                 if not apriori_result.empty:
                     array_return.append({'apriori': apriori_result})
+                else:
+                    array_return.append({"apriori":{"support": [],"itemsets":[]}})
                     
             if algorithms.get('decision', False):
                 decision_result = decision(columns)
@@ -224,6 +229,8 @@ def analyse(request):
     
     elif request.method == 'GET':
         return Response(array_return)
+    else:
+        return Response({"Error": "Choisir un algorithme"})
 
 
 
@@ -277,6 +284,7 @@ def connect_to_mysql(request):
 @csrf_exempt
 def reconnect_to_mysql(request):
     global conn
+    global connection_info
     if request.method == 'POST':
         # Récupérer les données POST du frontend
         data = json.loads(request.body)
@@ -302,14 +310,19 @@ def reconnect_to_mysql(request):
                 port=port
             )
             if conn.is_connected():
-                CreateModels();
-                CreateSerializer();
-                GetTables();
+                
+                connection_info = {
+                    'host': hostname,
+                    'database': dbname,
+                    'user': root,
+                    'password': password,
+                    'port': port
+                }
                 return JsonResponse({'message': 'Reconnexion réussie à MySQL avec de nouvelles informations de connexion'})
             else:
-                return JsonResponse({'error': 'Impossible de se reconnecter à MySQL avec de nouvelles informations de connexion'}, status=500)
+                return JsonResponse({'error': 'Impossible de se reconnecter à MySQL avec de nouvelles informations de connexion'})
         except mysql.connector.Error as e:
-            return JsonResponse({'error': f'Erreur de reconnexion à MySQL avec de nouvelles informations de connexion : {str(e)}'}, status=500)
+            return JsonResponse({'error': f'Erreur de reconnexion à MySQL avec de nouvelles informations de connexion : {str(e)}','check':'sqlError'})
 
     else:
         return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
